@@ -56,6 +56,8 @@ class _HomeShellState extends State<HomeShell> {
     ));
   }
 
+  int _savedVisits = 0;
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -68,14 +70,17 @@ class _HomeShellState extends State<HomeShell> {
         onRefresh: _manualRefresh,
       ),
       SearchPage(papers: widget.catalog.papers, downloads: widget.downloads),
-      DownloadsPage(papers: widget.catalog.papers, downloads: widget.downloads),
+      DownloadsPage(key: ValueKey(_savedVisits), papers: widget.catalog.papers, downloads: widget.downloads),
       const AboutPage(),
     ];
     return Scaffold(
       body: IndexedStack(index: _tab, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: (i) => setState(() {
+          if (i == 2) _savedVisits++;
+          _tab = i;
+        }),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Browse'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
@@ -164,7 +169,11 @@ class BrowsePage extends StatelessWidget {
 
 int Function(String, String) _naturalCompare(String level) {
   final yearDesc = level == 'group';
+  const boardOrder = ['Karnataka SSLC', 'Karnataka 2nd PUC', 'VTU Engineering'];
   return (a, b) {
+    if (level == 'board' && boardOrder.contains(a) && boardOrder.contains(b)) {
+      return boardOrder.indexOf(a).compareTo(boardOrder.indexOf(b));
+    }
     final ya = RegExp(r'(19|20)\d\d').firstMatch(a)?.group(0);
     final yb = RegExp(r'(19|20)\d\d').firstMatch(b)?.group(0);
     if (yearDesc && ya != null && yb != null && ya != yb) return yb.compareTo(ya);
@@ -282,8 +291,7 @@ class PdfViewerPage extends StatefulWidget {
 }
 
 class _PdfViewerPageState extends State<PdfViewerPage> {
-  late final PdfControllerPinch _controller =
-      PdfControllerPinch(document: PdfDocument.openFile(widget.file.path));
+  late final PdfController _controller = PdfController(document: PdfDocument.openFile(widget.file.path));
 
   @override
   void dispose() {
@@ -308,9 +316,10 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
           ),
         ],
       ),
-      body: PdfViewPinch(
+      body: PdfView(
         controller: _controller,
-        builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
+        scrollDirection: Axis.vertical,
+        builders: PdfViewBuilders<DefaultBuilderOptions>(
           options: const DefaultBuilderOptions(),
           errorBuilder: (_, error) => Center(child: Text('Cannot open PDF: $error')),
         ),

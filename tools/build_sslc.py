@@ -45,20 +45,28 @@ def main():
         if month:
             toks.pop()
         model = "model" in toks
-        flags = {t for t in toks if t in {"supp", "cce", "rf", "rr", "pf", "nsqf", "model", "paper"}}
-        set_ = paper_no = None
+        flags = {t for t in toks if t in {"supp", "cce", "rf", "rr", "pf", "nsqf", "model", "paper", "pr"}}
+        set_ = paper_no = version = None
         words, code, med = [], None, ""
         i = 0
         while i < len(toks):
             t = toks[i]
             if t == "set" and i + 1 < len(toks):
-                set_ = toks[i + 1].upper(); i += 2; continue
+                set_ = toks[i + 1].upper(); i += 2
+                if i < len(toks) and toks[i].isdigit() and len(toks[i]) == 1:
+                    set_ += f"-{toks[i]}"; i += 1
+                continue
+            if re.fullmatch(r"v\d", t):
+                version = t[1]; i += 1; continue
             if t in ("paper", "p") and i + 1 < len(toks) and toks[i + 1].isdigit():
                 paper_no = toks[i + 1]; i += 2; continue
+            if re.fullmatch(r"p\d", t):
+                paper_no = t[1]; i += 1; continue
             m = re.fullmatch(r"(\d{2})([a-z]{0,3})", t)
             if m and code is None and words:
                 code, med = m.group(1), m.group(2)
-                if not med and i + 1 < len(toks) and toks[i + 1] in MEDIUMS:
+                if not med and i + 1 < len(toks) and (toks[i + 1] in MEDIUMS or (
+                        re.fullmatch(r"[a-z]{1,2}", toks[i + 1]) and toks[i + 1] not in flags | {"p", "pr"})):
                     med = toks[i + 1]; i += 1
                 i += 1; continue
             if code is None and t not in flags and not re.fullmatch(r"p\d", t):
@@ -76,8 +84,13 @@ def main():
         subject = " ".join(w if w in {"and", "of"} else w.capitalize() for w in words)
         subject = re.sub(r"\s+\d$", "", subject).replace("Carnatic Music Hindustani Music", "Carnatic / Hindustani Music")
         model = model or prep
-        medium = MEDIUMS.get(med, "")
-        variant = "Regular Fresher" if "rf" in flags else "Regular Repeater" if "rr" in flags else ""
+        medium = MEDIUMS.get(med, med.upper())
+        variant = ("Regular Fresher" if "rf" in flags else "Regular Repeater" if "rr" in flags
+                   else "Private Fresher" if "pf" in flags else "Private Repeater" if "pr" in flags else "")
+        if "rr" in flags and "pr" in flags:
+            variant = "Repeater (Regular & Private)"
+        if version:
+            variant = f"{variant}, Version {version}".lstrip(", ")
         bits = [f"Set {set_}" if set_ else "", f"Paper {paper_no}" if paper_no else "",
                 f"{medium} medium" if medium else "", variant]
         detail = ", ".join(b for b in bits if b)
